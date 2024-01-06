@@ -1,4 +1,4 @@
-module github.com/workflow
+module github.com/silviutanasa/workflow
 
 go 1.19
 
