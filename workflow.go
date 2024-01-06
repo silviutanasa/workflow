@@ -9,10 +9,10 @@ type Command interface {
 	// Execute is the command's central processing unit.
 	// It accepts a context and a request which must be passed by reference.
 	// The purpose of the request is to pass data to the chain and also hold chain state across the commands,
-	// meaning that any command can also store data into the request and it will be available to the other cmds from the chain.
-	Execute(ctx context.Context, request interface{}) error
-	// CanRetryOnError decides if the command can retry to execute(in cases of failure for example).
-	CanRetryOnError() bool
+	// meaning that any command can also store data into the request, and it will be available to the other cmds from the chain.
+	Execute(ctx context.Context, request any) error
+	// CanRetry decides if the command can retry to execute(in cases of failure for example).
+	CanRetry() bool
 	// ContinueWorkflowOnError decides if the command can stop the propagation of the request to other commands that ran in a chain
 	// in case it returns an error.
 	ContinueWorkflowOnError() bool
@@ -23,13 +23,13 @@ type Command interface {
 
 // Logger is the workflow supported logger.
 type Logger interface {
-	Info(interface{})
-	Warn(interface{})
-	Error(interface{})
+	Info(any)
+	Warn(any)
+	Error(any)
 }
 
 type noOpLogger struct{}
 
-func (n noOpLogger) Info(_ interface{})  {}
-func (n noOpLogger) Warn(_ interface{})  {}
-func (n noOpLogger) Error(_ interface{}) {}
+func (n noOpLogger) Info(_ any)  {}
+func (n noOpLogger) Warn(_ any)  {}
+func (n noOpLogger) Error(_ any) {}

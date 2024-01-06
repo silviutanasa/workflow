@@ -412,7 +412,7 @@ func (c *cmdMock) Execute(ctx context.Context, request interface{}) error {
 	return c.execute
 }
 
-func (c *cmdMock) CanRetryOnError() bool {
+func (c *cmdMock) CanRetry() bool {
 	if c.retryOnErrReturnFalseAtInvocationCount == c.invocationCount {
 		return false
 	}

@@ -158,10 +158,10 @@ func (c *Sequential) executeCmd(ctx context.Context, cmd Command, req interface{
 		c.log.Error(fmt.Sprintf("--[%v] errored, returnedErr: %v", cmdName, err))
 
 		// what can happen is at some point in the retry cycle, the error becomes NOT retryable
-		// example: an HTTP request first return HTTP 500 status code, which should be retryable,
+		// example: a HTTP request first return HTTP 500 status code, which should be retryable,
 		// but on the second attempt it returns 400 which means bad data and should not be retried,
 		// so the retry cycle stop here in this case, even if there are more attempts left.
-		if !cmd.CanRetryOnError() {
+		if !cmd.CanRetry() {
 			break
 		}
 	}
