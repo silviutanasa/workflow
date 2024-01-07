@@ -1,0 +1,115 @@
+linters:
+  disable-all: true
+  enable:
+    - revive
+    - errcheck
+    - govet
+    - unused
+    - ineffassign
+    - unconvert
+    - goconst
+    - gosimple
+    - staticcheck
+    - gosec
+    - dogsled
+    - unparam
+  fast: true
+linters-settings:
+  revive:
+    rules:
+      - name: context-keys-type
+      - name: time-equal
+      - name: atomic
+      - name: var-declaration
+      - name: unexported-return
+      - name: unhandled-error
+        arguments: [ "fmt.Printf" ]
+      - name: blank-imports
+      - name: context-as-argument
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: var-naming
+      - name: range
+      - name: receiver-naming
+      - name: indent-error-flow
+      - name: argument-limit
+        #TODO: fix the functions that still have over 6 and are marked with
+        arguments: [ 6 ]
+      - name: cyclomatic
+        #TODO: work on reducing this number to a lower value
+        arguments: [ 9 ]
+      - name: superfluous-else
+      - name: confusing-naming
+      - name: modifies-parameter
+      - name: deep-exit
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: unnecessary-stmt
+      - name: modifies-value-receiver
+      - name: constant-logical-expr
+      - name: redefines-builtin-id
+      - name: function-result-limit
+        arguments: [ 4, 0 ]
+      - name: range-val-in-closure
+      - name: range-val-address
+      - name: waitgroup-by-value
+      - name: call-to-gc
+      - name: duplicated-imports
+      - name: import-shadowing
+      - name: bare-return
+      - name: cognitive-complexity
+        #TODO: work on reducing this number to a lower value
+        arguments: [ 14 ]
+      - name: early-return
+      - name: unconditional-recursion
+      - name: identical-branches
+      - name: defer
+      - name: unexported-naming
+      - name: useless-break
+      - name: datarace
+      - name: optimize-operands-order
+issues:
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - goconst
+        - staticcheck
+        - unparam
+        - revive
+        - unused
+        - govet
+        - gosec
+  # Maximum issues count per one linter.
+  # Set to 0 to disable.
+  # Default: 50
+  max-issues-per-linter: 0
+  # Maximum count of issues with the same text.
+  # Set to 0 to disable.
+  # Default: 3
+  max-same-issues: 0
+run:
+  deadline: 10m
+  skip-dirs:
+    - ".*\\testdata"
+  skip-files:
+    - ".*\\_mock\\.go"
+  allow-parallel-runners: true
+output:
+  # colored-line-number|line-number|json|tab|checkstyle, default is "colored-line-number"
+  # format: json
+
+  # print lines of code with issue, default is true
+  print-issued-lines: true
+
+  # print linter name in the end of issue text, default is true
+  print-linter-name: true
+
+# golangci.com configuration
+# https://github.com/golangci/golangci/wiki/Configuration
+service:
+  golangci-lint-version: 1.54.2 # use fixed version to not introduce new linters unexpectedly

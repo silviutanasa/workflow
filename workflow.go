@@ -2,23 +2,21 @@ package workflow
 
 import "context"
 
-// Command represents a step of execution(data processor).
-type Command interface {
-	// Name returns the name of the command.
+// Step represents a step of execution(data processor).
+type Step interface {
+	// Name returns the name of the step.
 	Name() string
-	// Execute is the command's central processing unit.
-	// It accepts a context and a request which must be passed by reference.
-	// The purpose of the request is to pass data to the chain and also hold chain state across the commands,
-	// meaning that any command can also store data into the request, and it will be available to the other cmds from the chain.
+	// Execute is the step central processing unit.
+	// It accepts a context and a request.
 	Execute(ctx context.Context, request any) error
-	// CanRetry decides if the command can retry to execute(in cases of failure for example).
-	CanRetry() bool
-	// ContinueWorkflowOnError decides if the command can stop the propagation of the request to other commands that ran in a chain
-	// in case it returns an error.
-	ContinueWorkflowOnError() bool
-	// StopWorkflow decides if the command can stop the propagation to other commands that ran in a chain
+	// StopWorkflow decides if the step can completely stop the workflow and also the propagation to other steps that should run in a chain
 	// after it completes its work.
 	StopWorkflow() bool
+	// CanRetry decides if the step can retry its execution.
+	CanRetry() bool
+	// ContinueWorkflowOnError decides if the step can stop the propagation of the request to other steps that ran in a chain
+	// in case the step returns an error.
+	ContinueWorkflowOnError() bool
 }
 
 // Logger is the workflow supported logger.
@@ -27,9 +25,3 @@ type Logger interface {
 	Warn(any)
 	Error(any)
 }
-
-type noOpLogger struct{}
-
-func (n noOpLogger) Info(_ any)  {}
-func (n noOpLogger) Warn(_ any)  {}
-func (n noOpLogger) Error(_ any) {}

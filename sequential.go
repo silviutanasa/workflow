@@ -9,25 +9,23 @@ import (
 )
 
 // Sequential is the representation of a Sequential workflow.
-// The Sequential workflow runs the underlying commands in the order provided by the user([]Command order).
-// It holds a chain of commands, a logger, a canRetry flag to decide if the workflow can safely retry execution
-// and an optional executionStoppedMsg message which is displayed in case of one of the commands from the workflow
-// invokes the request propagation stop.
+// The Sequential workflow runs the underlying steps in the order provided by the user([]Step order).
 // TODO: Add workflowHooksErr to this struct and expose a getter to it, so that the workflow errs are not mixed with the workflow hooks errs.
 type Sequential struct {
 	name               string
-	cmds               []Command
-	afterWorkflowHooks []Command
+	steps              []Step
+	afterWorkflowHooks []Step
 	log                Logger
-	waitBeforeRetry    time.Duration
-	maxRetryCount      uint
+	// retry parameters
+	waitBeforeRetry  time.Duration
+	maxRetryAttempts uint
 }
 
 // NewSequential is the workflow constructor.
-func NewSequential(name string, cmds []Command, options ...func(*Sequential)) *Sequential {
+func NewSequential(name string, steps []Step, options ...func(*Sequential)) *Sequential {
 	s := Sequential{
-		name: name,
-		cmds: cmds,
+		name:  name,
+		steps: steps,
 	}
 	for _, option := range options {
 		option(&s)
@@ -51,12 +49,12 @@ func WithLoggerOption(l Logger) func(*Sequential) {
 // WithRetryOption configures the workflow with the retry option.
 func WithRetryOption(maxRetryCount uint, waitBeforeRetry time.Duration) func(*Sequential) {
 	return func(s *Sequential) {
-		s.maxRetryCount = maxRetryCount
+		s.maxRetryAttempts = maxRetryCount
 		s.waitBeforeRetry = waitBeforeRetry
 	}
 }
 
-// Execute starts processing all the commands from the workflow inner chain of commands.
+// Execute starts processing all the steps from the workflow inner chain of steps.
 func (c *Sequential) Execute(ctx context.Context, req interface{}) error {
 	c.log.Info(fmt.Sprintf("[START] executing workflow: %v", c.name))
 	defer c.log.Info(fmt.Sprintf("[DONE] executing workflow: %v", c.name))
@@ -74,9 +72,9 @@ func (c *Sequential) Execute(ctx context.Context, req interface{}) error {
 	return nil
 }
 
-// AddAfterWorkflowHook allow adding a command that runs after the workflow finishes.
+// AddAfterWorkflowHook allow adding a step that runs after the workflow finishes.
 // It is guaranteed to run even if the workflow fails.
-func (c *Sequential) AddAfterWorkflowHook(hook Command) {
+func (c *Sequential) AddAfterWorkflowHook(hook Step) {
 	c.afterWorkflowHooks = append(c.afterWorkflowHooks, hook)
 }
 
@@ -86,14 +84,14 @@ func (c *Sequential) executeAfterWorkflowHooks(ctx context.Context, req interfac
 			hook := c.afterWorkflowHooks[i]
 
 			hookName := hook.Name()
-			c.log.Info(fmt.Sprintf("[start] executing after workflow hook, cmd name: %v", hookName))
+			c.log.Info(fmt.Sprintf("[start] executing after workflow hook, step name: %v", hookName))
 			err := hook.Execute(ctx, req)
 			if err != nil {
 				errs = append(errs, err)
 
-				c.log.Error(fmt.Sprintf("error executing after workflow hook, cmd name: %v, returnedErr: %v", hookName, err))
+				c.log.Error(fmt.Sprintf("error executing after workflow hook, step name: %v, returnedErr: %v", hookName, err))
 			}
-			c.log.Info(fmt.Sprintf("[done] executing after workflow hook, cmd name: %v", hookName))
+			c.log.Info(fmt.Sprintf("[done] executing after workflow hook, step name: %v", hookName))
 		}
 	}
 
@@ -102,18 +100,18 @@ func (c *Sequential) executeAfterWorkflowHooks(ctx context.Context, req interfac
 
 func (c *Sequential) executeWorkflow(ctx context.Context, req interface{}) []error {
 	var errs []error
-	for i, cmd := range c.cmds {
+	for i, step := range c.steps {
 		stepNr := i + 1
-		cmdName := cmd.Name()
+		stepName := step.Name()
 
-		c.log.Info(fmt.Sprintf("[start] executing step nr. %v from the workflow, cmd name: %v", stepNr, cmdName))
-		err := c.executeCmd(ctx, cmd, req)
-		c.log.Info(fmt.Sprintf("[done] executing step nr. %v from the workflow, cmd name: %v", stepNr, cmdName))
+		c.log.Info(fmt.Sprintf("[start] executing step nr. %v from the workflow, step name: %v", stepNr, stepName))
+		err := c.executeStep(ctx, step, req)
+		c.log.Info(fmt.Sprintf("[done] executing step nr. %v from the workflow, step name: %v", stepNr, stepName))
 		if err != nil {
 			errs = append(errs, err)
-			if cmd.ContinueWorkflowOnError() {
-				c.log.Warn(fmt.Sprintf("the cmd nr. %v from the workflow, cmd name: %v, is configured not to not "+
-					"stop the workflow on error, so the following cmds(if any) will still run", stepNr, cmdName))
+			if step.ContinueWorkflowOnError() {
+				c.log.Warn(fmt.Sprintf("the step nr. %v from the workflow, step name: %v, is configured not to not "+
+					"stop the workflow on error, so the following steps(if any) will still run", stepNr, stepName))
 
 				continue
 			}
@@ -121,10 +119,10 @@ func (c *Sequential) executeWorkflow(ctx context.Context, req interface{}) []err
 			break
 		}
 
-		if cmd.StopWorkflow() {
-			c.log.Warn(fmt.Sprintf("workflow execution stopped by cmd nr. %v from the workflow, cmd name: %v",
+		if step.StopWorkflow() {
+			c.log.Warn(fmt.Sprintf("workflow execution stopped by step nr. %v from the workflow, step name: %v",
 				stepNr,
-				cmdName,
+				stepName,
 			))
 
 			break
@@ -134,34 +132,34 @@ func (c *Sequential) executeWorkflow(ctx context.Context, req interface{}) []err
 	return errs
 }
 
-func (c *Sequential) executeCmd(ctx context.Context, cmd Command, req interface{}) error {
-	cmdName := cmd.Name()
+func (c *Sequential) executeStep(ctx context.Context, step Step, req interface{}) error {
+	stepName := step.Name()
 
 	var err error
 	var attempt uint
-	for attempt = 0; attempt <= c.maxRetryCount; attempt++ {
+	for attempt = 0; attempt <= c.maxRetryAttempts; attempt++ {
 		// if the attempt is more than 0, then it's a retry
 		if attempt > 0 {
-			c.log.Info(fmt.Sprintf("--[%v] is configured to retry", cmdName))
-			c.log.Info(fmt.Sprintf("--[%v] retry attempt count: %v", cmdName, attempt))
+			c.log.Info(fmt.Sprintf("--[%v] is configured to retry", stepName))
+			c.log.Info(fmt.Sprintf("--[%v] retry attempt count: %v", stepName, attempt))
 			// allow some waiting time before trying again
 			s := c.waitBeforeRetry
-			c.log.Info(fmt.Sprintf("--[%v] waiting for: %v before retry attempt", cmdName, s))
+			c.log.Info(fmt.Sprintf("--[%v] waiting for: %v before retry attempt", stepName, s))
 			time.Sleep(s)
 		}
-		err = cmd.Execute(ctx, req)
+		err = step.Execute(ctx, req)
 		if err == nil {
-			c.log.Info(fmt.Sprintf("--[%v] succeeded", cmdName))
+			c.log.Info(fmt.Sprintf("--[%v] succeeded", stepName))
 
 			break
 		}
-		c.log.Error(fmt.Sprintf("--[%v] errored, returnedErr: %v", cmdName, err))
+		c.log.Error(fmt.Sprintf("--[%v] errored, returnedErr: %v", stepName, err))
 
 		// what can happen is at some point in the retry cycle, the error becomes NOT retryable
 		// example: a HTTP request first return HTTP 500 status code, which should be retryable,
 		// but on the second attempt it returns 400 which means bad data and should not be retried,
 		// so the retry cycle stop here in this case, even if there are more attempts left.
-		if !cmd.CanRetry() {
+		if !step.CanRetry() {
 			break
 		}
 	}
@@ -169,23 +167,23 @@ func (c *Sequential) executeCmd(ctx context.Context, cmd Command, req interface{
 	return err
 }
 
-// ListSteps returns a []string with the names(obtained by the Command.Name() call) of all the component commands.
+// ListSteps returns a []string with the names(obtained by the Step.Name() call) of all the component steps.
 // it can be useful for logging/testing purposes.
 func (c *Sequential) ListSteps() []string {
-	l := len(c.cmds)
+	l := len(c.steps)
 	if l == 0 {
 		return nil
 	}
 
 	cn := make([]string, l)
 	for i := range cn {
-		cn[i] = c.cmds[i].Name()
+		cn[i] = c.steps[i].Name()
 	}
 
 	return cn
 }
 
-// ListHooks returns a []string with the names(obtained by the Command.Name() call) of all the component after workflow hooks.
+// ListHooks returns a []string with the names(obtained by the Step.Name() call) of all the component after workflow hooks.
 // it can be useful for logging/testing purposes.
 func (c *Sequential) ListHooks() []string {
 	l := len(c.afterWorkflowHooks)
@@ -230,3 +228,9 @@ func (w workflowErr) As(i interface{}) bool {
 
 	return false
 }
+
+type noOpLogger struct{}
+
+func (n noOpLogger) Info(_ any)  {}
+func (n noOpLogger) Warn(_ any)  {}
+func (n noOpLogger) Error(_ any) {}

@@ -17,15 +17,15 @@ func (t testRetryableErr) Error() string {
 }
 
 func Test_Execute_BehaviourOnPreservingErrorsType(t *testing.T) {
-	cmds := []Command{
-		&cmdMock{
+	steps := []Step{
+		&stepMock{
 			name:                  "cmd2",
 			execute:               errors.New("any err"),
 			retryOnErr:            false,
 			continueWorkflowOnErr: true,
 			stopWorkflow:          false,
 		},
-		&cmdMock{
+		&stepMock{
 			name:                  "cmd3",
 			execute:               testRetryableErr{},
 			retryOnErr:            false,
@@ -33,12 +33,12 @@ func Test_Execute_BehaviourOnPreservingErrorsType(t *testing.T) {
 			stopWorkflow:          false,
 		},
 	}
-	c := NewSequential("order-extractor", cmds, WithRetryOption(2, 0))
+	c := NewSequential("order-extractor", steps, WithRetryOption(2, 0))
 	actualResult := c.Execute(context.TODO(), struct{}{})
 
 	var expectedErr testRetryableErr
 	if !errors.As(actualResult, &expectedErr) {
-		t.Errorf("the workflow error does not embed the inner errors(errors returned by component cmds)")
+		t.Errorf("the workflow error does not embed the inner errors(errors returned by component steps)")
 	}
 }
 
@@ -46,27 +46,27 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          interface{}
-		mock           []Command
+		mock           []Step
 		expectedResult error
 	}{
 		{
 			name:           "an workflow with an empty chain should not return an error",
 			input:          struct{}{},
-			mock:           []Command{},
+			mock:           []Step{},
 			expectedResult: nil,
 		},
 		{
-			name:  "a workflow with commands returning errors, but configured not to stop on them, should return an error",
+			name:  "a workflow with steps returning errors, but configured not to stop on them, should return an error",
 			input: struct{}{},
-			mock: []Command{
-				&cmdMock{
+			mock: []Step{
+				&stepMock{
 					name:                  "cmd2",
 					execute:               cmpopts.AnyError,
 					retryOnErr:            false,
 					continueWorkflowOnErr: true,
 					stopWorkflow:          false,
 				},
-				&cmdMock{
+				&stepMock{
 					name:                  "cmd3",
 					execute:               nil,
 					retryOnErr:            false,
@@ -77,10 +77,10 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 			expectedResult: cmpopts.AnyError,
 		},
 		{
-			name:  "a workflow with commands returning error, but configured to retry, should not return an error if it succeeds on retry",
+			name:  "a workflow with steps returning error, but configured to retry, should not return an error if it succeeds on retry",
 			input: struct{}{},
-			mock: []Command{
-				&cmdMock{
+			mock: []Step{
+				&stepMock{
 					name:                     "cmd1",
 					succeedAtInvocationCount: 2,
 					execute:                  errors.New("some err"),
@@ -88,7 +88,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 					continueWorkflowOnErr:    false,
 					stopWorkflow:             false,
 				},
-				&cmdMock{
+				&stepMock{
 					name:                     "cmd2",
 					succeedAtInvocationCount: 3,
 					execute:                  errors.New("some err"),
@@ -96,7 +96,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 					continueWorkflowOnErr:    false,
 					stopWorkflow:             false,
 				},
-				&cmdMock{
+				&stepMock{
 					name:                  "cmd3",
 					execute:               nil,
 					retryOnErr:            false,
@@ -107,10 +107,10 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 			expectedResult: nil,
 		},
 		{
-			name:  "a workflow with commands returning error, but configured to retry, should return an error if it not succeed on retry",
+			name:  "a workflow with steps returning error, but configured to retry, should return an error if it not succeed on retry",
 			input: struct{}{},
-			mock: []Command{
-				&cmdMock{
+			mock: []Step{
+				&stepMock{
 					name:                     "cmd1",
 					succeedAtInvocationCount: 0,
 					execute:                  cmpopts.AnyError,
@@ -118,7 +118,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 					continueWorkflowOnErr:    false,
 					stopWorkflow:             false,
 				},
-				&cmdMock{
+				&stepMock{
 					name:                  "cmd3",
 					execute:               nil,
 					retryOnErr:            false,
@@ -153,17 +153,17 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          inp
-		mock           []Command
+		mock           []Step
 		expectedResult int
 	}{
 		{
-			name: "a workflow with commands returning error, but configured to retry, should stop retrying if the command returns false on retry",
+			name: "a workflow with steps returning error, but configured to retry, should stop retrying if the step returns false on retry",
 			input: inp{
 				req:             struct{}{},
 				workflowOptions: []func(sequential2 *Sequential){WithRetryOption(2, 0)},
 			},
-			mock: []Command{
-				&cmdMock{
+			mock: []Step{
+				&stepMock{
 					name:                                   "cmd1",
 					succeedAtInvocationCount:               0,
 					execute:                                cmpopts.AnyError,
@@ -176,13 +176,13 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 			expectedResult: 1,
 		},
 		{
-			name: "a workflow with commands returning error, but configured to retry, should not stop retrying if the command don't change its retry flag",
+			name: "a workflow with steps returning error, but configured to retry, should not stop retrying if the step don't change its retry flag",
 			input: inp{
 				req:             struct{}{},
 				workflowOptions: []func(sequential2 *Sequential){WithRetryOption(2, 0)},
 			},
-			mock: []Command{
-				&cmdMock{
+			mock: []Step{
+				&stepMock{
 					name:                     "cmd1",
 					succeedAtInvocationCount: 0,
 					execute:                  cmpopts.AnyError,
@@ -199,7 +199,7 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 			c := NewSequential("order-extractor", tt.mock, tt.input.workflowOptions...)
 			_ = c.Execute(context.TODO(), tt.input.req)
 
-			actualResult := c.cmds[0].(*cmdMock).invocationCount
+			actualResult := c.steps[0].(*stepMock).invocationCount
 			if diff := cmp.Diff(tt.expectedResult, actualResult, cmpopts.EquateErrors()); diff != "" {
 				t.Errorf("\n Returned value was not as expected \n actual result = %#v, \n expected result: %#v \n DIFF: %v \n",
 					actualResult,
@@ -214,29 +214,29 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 func Test_Execute_BehaviourOnWorkflowHooks(t *testing.T) {
 	tests := []struct {
 		name  string
-		input []Command
-		mock  []Command
+		input []Step
+		mock  []Step
 		// number of invoked hooks
 		expectedResult int
 	}{
 		{
 			name: "a workflow with HOOKS should always run them no mather what happens in the workflow",
-			input: []Command{
-				&cmdMock{
+			input: []Step{
+				&stepMock{
 					name:    "after workflow HOOK cmd1",
 					execute: errors.New("some err"),
 				},
-				&cmdMock{
+				&stepMock{
 					name:    "after workflow HOOK cmd2",
 					execute: nil,
 				},
 			},
-			mock: []Command{
-				&cmdMock{
+			mock: []Step{
+				&stepMock{
 					name:    "cmd1",
 					execute: nil,
 				},
-				&cmdMock{
+				&stepMock{
 					name:    "cmd2",
 					execute: nil,
 				},
@@ -245,30 +245,30 @@ func Test_Execute_BehaviourOnWorkflowHooks(t *testing.T) {
 		},
 		{
 			name: "a workflow with HOOKS should always run them no mather what happens in the workflow and even if one of the hooks returns an error",
-			input: []Command{
-				&cmdMock{
+			input: []Step{
+				&stepMock{
 					name:    "after workflow HOOK cmd1",
 					execute: errors.New("some err"),
 				},
-				&cmdMock{
+				&stepMock{
 					name:    "after workflow HOOK cmd2",
 					execute: nil,
 				},
-				&cmdMock{
+				&stepMock{
 					name:    "after workflow HOOK cmd3",
 					execute: nil,
 				},
-				&cmdMock{
+				&stepMock{
 					name:    "after workflow HOOK cmd4",
 					execute: errors.New("some err"),
 				},
 			},
-			mock: []Command{
-				&cmdMock{
+			mock: []Step{
+				&stepMock{
 					name:    "cmd1",
 					execute: nil,
 				},
-				&cmdMock{
+				&stepMock{
 					name:    "cmd2",
 					execute: errors.New("some err"),
 				},
@@ -285,7 +285,7 @@ func Test_Execute_BehaviourOnWorkflowHooks(t *testing.T) {
 			_ = c.Execute(context.TODO(), struct{}{})
 			actualResult := 0
 			for j := range tt.input {
-				convertedCmd := tt.input[j].(*cmdMock)
+				convertedCmd := tt.input[j].(*stepMock)
 				actualResult += convertedCmd.invocationCount
 			}
 
@@ -306,28 +306,28 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          interface{}
-		mock           []Command
+		mock           []Step
 		expectedResult expRes
 	}{
 		{
-			name:  "a workflow with commands returning errors, but configured not to stop on them, should invoke all the commands",
+			name:  "a workflow with steps returning errors, but configured not to stop on them, should invoke all the steps",
 			input: struct{}{},
-			mock: []Command{
-				&cmdMock{
+			mock: []Step{
+				&stepMock{
 					name:                  "cmd1",
 					execute:               errors.New("some err"),
 					retryOnErr:            false,
 					continueWorkflowOnErr: true,
 					stopWorkflow:          false,
 				},
-				&cmdMock{
+				&stepMock{
 					name:                  "cmd2",
 					execute:               errors.New("some err"),
 					retryOnErr:            false,
 					continueWorkflowOnErr: true,
 					stopWorkflow:          false,
 				},
-				&cmdMock{
+				&stepMock{
 					name:                  "cmd1",
 					invocationCount:       0,
 					execute:               nil,
@@ -339,24 +339,24 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 			expectedResult: expRes{lastCmdWasInvoked: true},
 		},
 		{
-			name:  "a workflow with commands configured to stop it will immediately stop the workflow",
+			name:  "a workflow with steps configured to stop it will immediately stop the workflow",
 			input: struct{}{},
-			mock: []Command{
-				&cmdMock{
+			mock: []Step{
+				&stepMock{
 					name:                  "cmd1",
 					execute:               nil,
 					retryOnErr:            false,
 					continueWorkflowOnErr: false,
 					stopWorkflow:          false,
 				},
-				&cmdMock{
+				&stepMock{
 					name:                  "cmd2",
 					execute:               nil,
 					retryOnErr:            false,
 					continueWorkflowOnErr: true,
 					stopWorkflow:          true,
 				},
-				&cmdMock{
+				&stepMock{
 					name:                  "cmd3",
 					execute:               nil,
 					retryOnErr:            false,
@@ -376,7 +376,7 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 			c := NewSequential("order-extractor", tt.mock, WithRetryOption(2, 0))
 			_ = c.Execute(context.TODO(), tt.input)
 
-			actualResult := tt.mock[len(tt.mock)-1].(*cmdMock).invocationCount > 0
+			actualResult := tt.mock[len(tt.mock)-1].(*stepMock).invocationCount > 0
 			expectedResult := tt.expectedResult.lastCmdWasInvoked
 
 			if actualResult != expectedResult {
@@ -389,7 +389,7 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 	}
 }
 
-type cmdMock struct {
+type stepMock struct {
 	invocationCount                        int
 	succeedAtInvocationCount               int
 	name                                   string
@@ -400,11 +400,11 @@ type cmdMock struct {
 	stopWorkflow                           bool
 }
 
-func (c *cmdMock) Name() string {
+func (c *stepMock) Name() string {
 	return c.name
 }
 
-func (c *cmdMock) Execute(ctx context.Context, request interface{}) error {
+func (c *stepMock) Execute(ctx context.Context, request any) error {
 	c.invocationCount++
 	if c.succeedAtInvocationCount == c.invocationCount {
 		return nil
@@ -412,7 +412,7 @@ func (c *cmdMock) Execute(ctx context.Context, request interface{}) error {
 	return c.execute
 }
 
-func (c *cmdMock) CanRetry() bool {
+func (c *stepMock) CanRetry() bool {
 	if c.retryOnErrReturnFalseAtInvocationCount == c.invocationCount {
 		return false
 	}
@@ -420,10 +420,10 @@ func (c *cmdMock) CanRetry() bool {
 	return c.retryOnErr
 }
 
-func (c *cmdMock) ContinueWorkflowOnError() bool {
+func (c *stepMock) ContinueWorkflowOnError() bool {
 	return c.continueWorkflowOnErr
 }
 
-func (c *cmdMock) StopWorkflow() bool {
+func (c *stepMock) StopWorkflow() bool {
 	return c.stopWorkflow
 }
