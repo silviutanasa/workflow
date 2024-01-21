@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"time"
 )
 
 // ETL (Extract Transform Load) workflow
@@ -30,7 +31,7 @@ func ETL() error {
 			},
 		},
 	}
-	wf := NewSequential("ETL", steps)
+	wf := NewSequential("ETL", steps, nil, RetryConfig{2, 0})
 
 	return wf.Execute(context.TODO(), nil)
 }
@@ -87,6 +88,10 @@ func (s *stepAbstract) StopWorkflow() bool {
 
 func (s *stepAbstract) CanRetry() bool {
 	return s.canRetry
+}
+
+func (s *stepAbstract) RetryConfig() (attempts uint, delay time.Duration) {
+	return 1, time.Microsecond
 }
 
 func (s *stepAbstract) ContinueWorkflowOnError() bool {

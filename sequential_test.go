@@ -33,7 +33,8 @@ func Test_Execute_BehaviourOnPreservingErrorsType(t *testing.T) {
 			stopWorkflow:          false,
 		},
 	}
-	c := NewSequential("order-extractor", steps, WithRetryOption(2, 0))
+
+	c := NewSequential("order-extractor", steps, nil, RetryConfig{2, 0})
 	actualResult := c.Execute(context.TODO(), struct{}{})
 
 	var expectedErr testRetryableErr
@@ -131,7 +132,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("some-workflow", tt.mock, WithRetryOption(2, 0))
+			c := NewSequential("some-workflow", tt.mock, nil, RetryConfig{2, 0})
 			actualResult := c.Execute(context.TODO(), tt.input)
 
 			if diff := cmp.Diff(actualResult, tt.expectedResult, cmpopts.EquateErrors()); diff != "" {
@@ -147,8 +148,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 
 func Test_Execute_BehaviourOnRetry(t *testing.T) {
 	type inp struct {
-		req             interface{}
-		workflowOptions []func(*Sequential)
+		req interface{}
 	}
 	tests := []struct {
 		name           string
@@ -159,8 +159,7 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 		{
 			name: "a workflow with steps returning error, but configured to retry, should stop retrying if the step returns false on retry",
 			input: inp{
-				req:             struct{}{},
-				workflowOptions: []func(sequential2 *Sequential){WithRetryOption(2, 0)},
+				req: struct{}{},
 			},
 			mock: []Step{
 				&stepMock{
@@ -178,8 +177,7 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 		{
 			name: "a workflow with steps returning error, but configured to retry, should not stop retrying if the step don't change its retry flag",
 			input: inp{
-				req:             struct{}{},
-				workflowOptions: []func(sequential2 *Sequential){WithRetryOption(2, 0)},
+				req: struct{}{},
 			},
 			mock: []Step{
 				&stepMock{
@@ -196,7 +194,7 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("order-extractor", tt.mock, tt.input.workflowOptions...)
+			c := NewSequential("order-extractor", tt.mock, nil, RetryConfig{2, 0})
 			_ = c.Execute(context.TODO(), tt.input.req)
 
 			actualResult := c.steps[0].(*stepMock).invocationCount
@@ -278,7 +276,7 @@ func Test_Execute_BehaviourOnWorkflowHooks(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("order-extractor", tt.mock, WithRetryOption(2, 0))
+			c := NewSequential("order-extractor", tt.mock, nil, RetryConfig{2, 0})
 			for i := range tt.input {
 				c.AddAfterWorkflowHook(tt.input[i])
 			}
@@ -373,7 +371,7 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("order-extractor", tt.mock, WithRetryOption(2, 0))
+			c := NewSequential("order-extractor", tt.mock, nil, RetryConfig{2, 0})
 			_ = c.Execute(context.TODO(), tt.input)
 
 			actualResult := tt.mock[len(tt.mock)-1].(*stepMock).invocationCount > 0
@@ -426,4 +424,36 @@ func (c *stepMock) ContinueWorkflowOnError() bool {
 
 func (c *stepMock) StopWorkflow() bool {
 	return c.stopWorkflow
+}
+
+// BENCHMARKS
+func BenchmarkSequential(b *testing.B) {
+	s1 := stepMock{
+		name:                  "cmd1",
+		execute:               nil,
+		retryOnErr:            false,
+		continueWorkflowOnErr: false,
+		stopWorkflow:          false,
+	}
+	s2 := stepMock{
+		name:                  "cmd2",
+		execute:               nil,
+		retryOnErr:            false,
+		continueWorkflowOnErr: true,
+		stopWorkflow:          true,
+	}
+	s3 := stepMock{
+		name:                  "cmd3",
+		execute:               nil,
+		retryOnErr:            false,
+		continueWorkflowOnErr: false,
+		stopWorkflow:          false,
+	}
+	var steps []Step
+	steps = append(steps, &s1, &s2, &s3)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		seq := NewSequential("test-service", steps, nil, RetryConfig{2, 0})
+		_ = seq.Execute(context.TODO(), struct{}{})
+	}
 }

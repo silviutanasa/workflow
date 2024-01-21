@@ -1,6 +1,8 @@
 package workflow
 
-import "context"
+import (
+	"context"
+)
 
 // Step represents a step of execution(data processor).
 type Step interface {
@@ -14,6 +16,7 @@ type Step interface {
 	StopWorkflow() bool
 	// CanRetry decides if the step can retry its execution.
 	CanRetry() bool
+
 	// ContinueWorkflowOnError decides if the step can stop the propagation of the request to other steps that ran in a chain
 	// in case the step returns an error.
 	ContinueWorkflowOnError() bool
@@ -21,7 +24,6 @@ type Step interface {
 
 // Logger is the workflow supported logger.
 type Logger interface {
-	Info(any)
-	Warn(any)
-	Error(any)
+	Info(msg string)
+	Error(msg string)
 }
