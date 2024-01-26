@@ -23,7 +23,7 @@ linters-settings:
       - name: var-declaration
       - name: unexported-return
       - name: unhandled-error
-        arguments: [ "fmt.Printf" ]
+        arguments: [ "fmt.Printf", "bytes.Buffer.WriteString" ]
       - name: blank-imports
       - name: context-as-argument
       - name: dot-imports
@@ -37,10 +37,8 @@ linters-settings:
       - name: receiver-naming
       - name: indent-error-flow
       - name: argument-limit
-        #TODO: fix the functions that still have over 6 and are marked with
         arguments: [ 6 ]
       - name: cyclomatic
-        #TODO: work on reducing this number to a lower value
         arguments: [ 9 ]
       - name: superfluous-else
       - name: confusing-naming

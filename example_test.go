@@ -3,37 +3,35 @@ package workflow
 import (
 	"context"
 	"fmt"
-	"time"
 )
 
-// ETL (Extract Transform Load) workflow
-func ETL() error {
-	steps := []Step{
-		&extractData{
-			stepAbstract{
-				stopWorkflow:            false,
-				canRetry:                false,
-				continueWorkflowOnError: false,
-			},
+func ExampleSequential_Execute() {
+	stepsCfg := []StepConfig{
+		{
+			Step:                    &extractData{},
+			ContinueWorkflowOnError: false,
 		},
-		&transformData{
-			stepAbstract{
-				stopWorkflow:            false,
-				canRetry:                false,
-				continueWorkflowOnError: false,
-			},
+		{
+			Step:                    &transformData{},
+			ContinueWorkflowOnError: false,
 		},
-		&loadData{
-			stepAbstract{
-				stopWorkflow:            false,
-				canRetry:                false,
-				continueWorkflowOnError: false,
-			},
+		{
+			Step:                    &loadData{},
+			ContinueWorkflowOnError: false,
 		},
 	}
-	wf := NewSequential("ETL", steps, nil, RetryConfig{2, 0})
-
-	return wf.Execute(context.TODO(), nil)
+	postHooks := []Step{
+		&logRequestData{},
+		&sendCompletionNotification{},
+	}
+	wf := NewSequential("ETL", stepsCfg, postHooks, RetryConfig{2, 0}, nil)
+	_ = wf.Execute(context.TODO(), nil)
+	// Output:
+	// I extracted the data
+	// I transformed the data
+	// I loaded the data
+	// I logged the request data
+	// I sent the completion notification
 }
 
 // Extract
@@ -66,11 +64,28 @@ func (e *loadData) Execute(ctx context.Context, request any) error {
 	return nil
 }
 
+// Log request data
+type logRequestData struct {
+	stepAbstract
+}
+
+func (l *logRequestData) Execute(ctx context.Context, request any) error {
+	fmt.Println("I logged the request data")
+	return nil
+}
+
+type sendCompletionNotification struct {
+	stepAbstract
+}
+
+func (s *sendCompletionNotification) Execute(ctx context.Context, request any) error {
+	fmt.Println("I sent the completion notification")
+	return nil
+}
+
 type stepAbstract struct {
-	name                    string
-	stopWorkflow            bool
-	canRetry                bool
-	continueWorkflowOnError bool
+	name     string
+	canRetry bool
 }
 
 func (s *stepAbstract) Name() string {
@@ -78,22 +93,9 @@ func (s *stepAbstract) Name() string {
 }
 
 func (s *stepAbstract) Execute(ctx context.Context, request any) error {
-	//TODO implement me
 	panic("implement me")
-}
-
-func (s *stepAbstract) StopWorkflow() bool {
-	return s.stopWorkflow
 }
 
 func (s *stepAbstract) CanRetry() bool {
 	return s.canRetry
-}
-
-func (s *stepAbstract) RetryConfig() (attempts uint, delay time.Duration) {
-	return 1, time.Microsecond
-}
-
-func (s *stepAbstract) ContinueWorkflowOnError() bool {
-	return s.continueWorkflowOnError
 }

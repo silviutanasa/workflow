@@ -1,5 +1,7 @@
 # Workflow
 
-A service that allow you to build a process workflow, allowing you to define your business logic as commands/steps and orchestrate them.
+A library that allows you to define the business logic in steps and orchestrate them in a workflow.
 
-1. **Sequential**: is a workflow that runs all of its steps/commands in a predefined order/sequence.
+**Sequential** is a workflow that runs all of its steps/commands in a predefined order/sequence. \
+It has the ability to retry at the step level, with a configured number of attempts and delay. \
+It allows optional steps to run as post workflow execution hooks, which means they'll run no mather the status of the workflow execution(success or error)
