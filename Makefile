@@ -1,10 +1,10 @@
 .PHONY: test
 test:
-	go test -race ./... -v -count=1
+	go test -race ./... -count=1
 
 .PHONY: test-cover
 test-cover:
-	@go test -race ./... -coverprofile unit_test_coverage.out -count=1 && go tool cover -func=unit_test_coverage.out
+	go test -race ./... -coverprofile unit_test_coverage.out -count=1 && go tool cover -func=unit_test_coverage.out
 
 .PHONY: bench
 bench:

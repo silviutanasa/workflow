@@ -115,7 +115,7 @@ func (s *Sequential) executeStep(ctx context.Context, stepCfg StepConfig, req an
 				s.concatStr("step: ", stepName, " is configured to retry", ", retry attempt count: ", strconv.Itoa(int(attempt))),
 			)
 			// allow some waiting time before trying again
-			s.log.Info(s.concatStr("waiting for: ", attemptDelay.String(), " before retry attempt"))
+			s.log.Info(s.concatStr("waiting for: ", strconv.FormatInt(attemptDelay.Milliseconds(), 10), "ms before retry attempt"))
 			time.Sleep(attemptDelay)
 		}
 		err = step.Execute(ctx, req)

@@ -95,7 +95,7 @@ run:
   skip-dirs:
     - ".*\\testdata"
   skip-files:
-    - ".*\\_mock\\.go"
+    - ".*\\_test\\.go"
   allow-parallel-runners: true
 output:
   # colored-line-number|line-number|json|tab|checkstyle, default is "colored-line-number"
