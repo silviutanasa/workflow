@@ -12,7 +12,10 @@ type Step interface {
 	// Execute is the step central processing unit.
 	// It accepts a context and a request.
 	Execute(ctx context.Context, request any) error
-	// CanRetry decides if the step can retry its execution.
+}
+
+// Retryer signals if an operation is retryable.
+type Retryer interface {
 	CanRetry() bool
 }
 
@@ -26,12 +29,8 @@ type Logger interface {
 type StepConfig struct {
 	Step                    Step
 	ContinueWorkflowOnError bool
-}
-
-// RetryConfig is the config for the step retry
-type RetryConfig struct {
-	MaxRetryAttempts uint
-	WaitBeforeRetry  time.Duration
+	// define this only if the Step implements Retryer, otherwise it has no effect and no sense!
+	RetryConfigProvider func() (maxAttempts uint, attemptDelay time.Duration)
 }
 
 type noOpLogger struct{}

@@ -4,10 +4,13 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 )
+
+var defaultRetryConfigProviderTest = func() (maxAttempts uint, attemptDelay time.Duration) { return 2, time.Nanosecond }
 
 type testRetryableErr struct {
 }
@@ -36,7 +39,7 @@ func Test_Execute_BehaviourOnPreservingErrorsType(t *testing.T) {
 		},
 	}
 
-	c := NewSequential("order-extractor", steps, nil, RetryConfig{2, 0}, nil)
+	c := NewSequential("order-extractor", steps, nil)
 	actualResult := c.Execute(context.TODO(), nil)
 
 	var expectedErr testRetryableErr
@@ -69,6 +72,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 						canRetry: false,
 					},
 					ContinueWorkflowOnError: true,
+					RetryConfigProvider:     defaultRetryConfigProviderTest,
 				},
 				{
 					Step: &stepMock{
@@ -77,6 +81,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 						canRetry: false,
 					},
 					ContinueWorkflowOnError: false,
+					RetryConfigProvider:     defaultRetryConfigProviderTest,
 				},
 			},
 			expectedResult: cmpopts.AnyError,
@@ -93,6 +98,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 						canRetry:                 true,
 					},
 					ContinueWorkflowOnError: false,
+					RetryConfigProvider:     defaultRetryConfigProviderTest,
 				},
 				{
 					Step: &stepMock{
@@ -102,6 +108,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 						canRetry:                 true,
 					},
 					ContinueWorkflowOnError: false,
+					RetryConfigProvider:     defaultRetryConfigProviderTest,
 				},
 				{
 					Step: &stepMock{
@@ -110,6 +117,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 						canRetry: false,
 					},
 					ContinueWorkflowOnError: false,
+					RetryConfigProvider:     defaultRetryConfigProviderTest,
 				},
 			},
 			expectedResult: nil,
@@ -126,6 +134,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 						canRetry:                 true,
 					},
 					ContinueWorkflowOnError: false,
+					RetryConfigProvider:     defaultRetryConfigProviderTest,
 				},
 				{
 					Step: &stepMock{
@@ -134,6 +143,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 						canRetry: false,
 					},
 					ContinueWorkflowOnError: false,
+					RetryConfigProvider:     defaultRetryConfigProviderTest,
 				},
 			},
 			expectedResult: cmpopts.AnyError,
@@ -141,7 +151,7 @@ func Test_Execute_BehaviourOnReturningErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("some-workflow", tt.mock, nil, RetryConfig{2, 0}, nil)
+			c := NewSequential("some-workflow", tt.mock, nil)
 			actualResult := c.Execute(context.TODO(), tt.input)
 
 			if diff := cmp.Diff(actualResult, tt.expectedResult, cmpopts.EquateErrors()); diff != "" {
@@ -180,6 +190,7 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 						canRetryReturnFalseAtInvocationCount: 1,
 					},
 					ContinueWorkflowOnError: false,
+					RetryConfigProvider:     defaultRetryConfigProviderTest,
 				},
 			},
 			expectedResult: 1,
@@ -198,6 +209,7 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 						canRetry:                 true,
 					},
 					ContinueWorkflowOnError: false,
+					RetryConfigProvider:     defaultRetryConfigProviderTest,
 				},
 			},
 			expectedResult: 3,
@@ -205,7 +217,7 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("zorder-extractor", tt.mock, nil, RetryConfig{2, 0}, nil)
+			c := NewSequential("zorder-extractor", tt.mock, nil)
 			_ = c.Execute(context.TODO(), tt.input.req)
 
 			actualResult := c.stepsConfig[0].Step.(*stepMock).invocationCount
@@ -214,109 +226,6 @@ func Test_Execute_BehaviourOnRetry(t *testing.T) {
 					actualResult,
 					tt.expectedResult,
 					diff,
-				)
-			}
-		})
-	}
-}
-
-func Test_Execute_BehaviourOnWorkflowHooks(t *testing.T) {
-	tests := []struct {
-		name  string
-		input []StepConfig
-		mock  []Step
-		// number of invoked hooks
-		expectedResult int
-	}{
-		{
-			name: "a workflow with HOOKS should always run them no mather what happens in the workflow",
-			input: []StepConfig{
-				{
-					Step: &stepMock{
-						name:    "after workflow HOOK cmd1",
-						execute: errors.New("some err"),
-					},
-					ContinueWorkflowOnError: false,
-				},
-				{
-					Step: &stepMock{
-						name:    "after workflow HOOK cmd2",
-						execute: nil,
-					},
-					ContinueWorkflowOnError: false,
-				},
-			},
-			mock: []Step{
-				&stepMock{
-					name:    "cmd1",
-					execute: nil,
-				},
-				&stepMock{
-					name:    "cmd2",
-					execute: nil,
-				},
-			},
-			expectedResult: 2,
-		},
-		{
-			name: "a workflow with HOOKS should always run them no mather what happens in the workflow and even if one of the hooks returns an error",
-			input: []StepConfig{
-				{
-					Step: &stepMock{
-						name:    "after workflow HOOK cmd1",
-						execute: nil,
-					},
-					ContinueWorkflowOnError: false,
-				},
-				{
-					Step: &stepMock{
-						name:    "after workflow HOOK cmd2",
-						execute: nil,
-					},
-					ContinueWorkflowOnError: false,
-				},
-				{
-					Step: &stepMock{
-						name:    "after workflow HOOK cmd3",
-						execute: nil,
-					},
-					ContinueWorkflowOnError: false,
-				},
-				{
-					Step: &stepMock{
-						name:    "after workflow HOOK cmd4",
-						execute: errors.New("some err"),
-					},
-					ContinueWorkflowOnError: false,
-				},
-			},
-			mock: []Step{
-				&stepMock{
-					name:    "cmd1",
-					execute: nil,
-				},
-				&stepMock{
-					name:    "cmd2",
-					execute: errors.New("some err"),
-				},
-			},
-			expectedResult: 2,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("order-extractor", tt.input, tt.mock, RetryConfig{2, 0}, nil)
-			_ = c.Execute(context.TODO(), struct{}{})
-			actualResult := 0
-			for j := range tt.mock {
-				convertedCmd := tt.mock[j].(*stepMock)
-				actualResult += convertedCmd.invocationCount
-			}
-
-			if actualResult != tt.expectedResult {
-				t.Errorf("\n Returned value was not as expected \n actual result = %#v, \n expected result: %#v \n",
-					actualResult,
-					tt.expectedResult,
 				)
 			}
 		})
@@ -372,7 +281,7 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("order-extractor", tt.mock, nil, RetryConfig{2, 0}, nil)
+			c := NewSequential("order-extractor", tt.mock, nil)
 			_ = c.Execute(context.TODO(), tt.input)
 
 			actualResult := tt.mock[len(tt.mock)-1].Step.(*stepMock).invocationCount > 0
@@ -419,38 +328,26 @@ func (c *stepMock) CanRetry() bool {
 
 // BENCHMARKS
 func BenchmarkSequential(b *testing.B) {
-	s1 := stepMock{
-		name:     "cmd1",
-		execute:  nil,
-		canRetry: false,
+	s1 := stepMock{name: "extract-data-from-data-provider"}
+	s2 := stepMock{name: "transform-data-extracted-from-data-provider"}
+	s3 := stepMock{name: "load-the-data-into-the-data-source"}
+	s4 := stepMock{name: "log-request-data"}
+	s5 := stepMock{name: "notify-monitoring-system"}
+	stepsCfgW2 := []StepConfig{
+		{Step: &s4},
+		{Step: &s5},
 	}
-	s2 := stepMock{
-		name:     "cmd2",
-		execute:  nil,
-		canRetry: false,
-	}
-	s3 := stepMock{
-		name:     "cmd3",
-		execute:  nil,
-		canRetry: false,
-	}
+	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
 	stepsCfg := []StepConfig{
-		{
-			Step:                    &s1,
-			ContinueWorkflowOnError: false,
-		},
-		{
-			Step:                    &s2,
-			ContinueWorkflowOnError: false,
-		},
-		{
-			Step:                    &s3,
-			ContinueWorkflowOnError: false,
-		},
+		{Step: &s1},
+		{Step: &s2},
+		{Step: &s3},
+		{Step: w2},
 	}
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		seq := NewSequential("test-service", stepsCfg, nil, RetryConfig{2, 0}, nil)
-		_ = seq.Execute(context.TODO(), struct{}{})
+		seq := NewSequential("just-execute-these-steps-workflow", stepsCfg, nil)
+		_ = seq.Execute(context.TODO(), nil)
 	}
 }
