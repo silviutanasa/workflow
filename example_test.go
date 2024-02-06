@@ -20,7 +20,7 @@ func ExampleSequential_Execute() {
 	}
 
 	wf := NewSequential("ETL", stepsCfg, nil)
-	_ = wf.Execute(context.TODO(), nil)
+	wf.Execute(context.TODO(), nil)
 	// Output:
 	//running: get-raw-data-from-db
 	//running: transform-raw-data-into-models

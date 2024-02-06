@@ -21,7 +21,7 @@ func TestExecuteBehaviourOnPreservingErrorsType(t *testing.T) {
 	expectedOutput := anyErr
 
 	if !errors.Is(actualOutput, expectedOutput) {
-		t.Errorf("the workflow error does not wrap the inner errors: \n expected = %#v, \n actual = %#v", expectedOutput, actualOutput)
+		t.Errorf("The workflow error does not wrap the inner errors: \n expected = %#v, \n actual = %#v", expectedOutput, actualOutput)
 	}
 }
 
@@ -69,7 +69,7 @@ func TestExecuteBehaviourOnReturningErrors(t *testing.T) {
 			actualOutput := c.Execute(context.TODO(), nil)
 
 			if !errors.Is(actualOutput, tt.expectedOutput) {
-				t.Errorf("\n the workflow returned error behaviour not as expected: \n expected = %#v \n actual = %#v",
+				t.Errorf("The workflow returned error behaviour not as expected: \n expected = %#v \n actual = %#v",
 					tt.expectedOutput,
 					actualOutput,
 				)
@@ -103,11 +103,11 @@ func TestExecuteBehaviourOnRetry(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewSequential("some-workflow", tt.input, nil)
-			_ = c.Execute(context.TODO(), nil)
+			c.Execute(context.TODO(), nil)
 
 			actualOutput := c.stepsConfig[0].Step.(*stepMock).invocationCount
 			if tt.expectedOutput != actualOutput {
-				t.Errorf("\n workflow behaviour on retry, not as expected: \n actual = %#v, \n expected = %#v",
+				t.Errorf("The workflow behaviour on retry, not as expected: \n actual = %#v, \n expected = %#v",
 					actualOutput,
 					tt.expectedOutput,
 				)
@@ -118,9 +118,14 @@ func TestExecuteBehaviourOnRetry(t *testing.T) {
 
 func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 	anyErr := errors.New("any-err")
+	testResultMap := map[bool]string{
+		true:  "stopped",
+		false: "not stopped",
+	}
 	type behaviour struct {
 		lastCmdWasInvoked bool
 	}
+
 	tests := []struct {
 		name           string
 		input          []StepConfig
@@ -145,20 +150,17 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 			expectedOutput: behaviour{lastCmdWasInvoked: false},
 		},
 	}
-	testResultMap := map[bool]string{
-		true:  "stopped",
-		false: "not stopped",
-	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			c := NewSequential("some-workflow", tt.input, nil)
-			_ = c.Execute(context.TODO(), nil)
+			c.Execute(context.TODO(), nil)
 
 			actualOutput := tt.input[len(tt.input)-1].Step.(*stepMock).invocationCount > 0
 			expectedOutput := tt.expectedOutput.lastCmdWasInvoked
 
 			if actualOutput != expectedOutput {
-				t.Errorf("\n The workflow did not behave as expected \n actual result = %#v, \n expected result: %#v \n",
+				t.Errorf("The workflow did not behave as expected \n actual result = %#v, \n expected result: %#v \n",
 					testResultMap[actualOutput],
 					testResultMap[tt.expectedOutput.lastCmdWasInvoked],
 				)
@@ -167,6 +169,57 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 	}
 }
 
+// BENCHMARKS
+
+// BenchmarkSequentialHappyFlow performs a benchmark for the scenario in which there is no error in the workflow.
+// This should produce 0 allocations.
+func BenchmarkSequentialHappyFlow(b *testing.B) {
+	stepsCfgW2 := []StepConfig{
+		{Step: newStepSuccessful("log-request-data")},
+		{Step: newStepSuccessful("notify-monitoring-system")},
+	}
+	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
+	stepsCfg := []StepConfig{
+		{Step: newStepSuccessful("extract-data-from-data-provider")},
+		{Step: newStepSuccessful("transform-data-extracted-from-data-provider")},
+		{Step: newStepSuccessful("load-the-data-into-the-data-source")},
+		{Step: w2},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s := NewSequential("just-execute-these-steps-workflow", stepsCfg, nil)
+		s.Execute(context.TODO(), nil)
+	}
+}
+
+// BenchmarkSequentialErrFlow performs a benchmark for the scenario in which there are errors in the workflow.
+// This should produce 3 allocations, corresponding to the error usage (allocation for the error slice and errors.Join)
+func BenchmarkSequentialErrFlow(b *testing.B) {
+	stepsCfgW2 := []StepConfig{
+		{Step: newStepSuccessful("log-request-data")},
+		{Step: newStepSuccessful("notify-monitoring-system")},
+	}
+	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
+	stepsCfg := []StepConfig{
+		{Step: newStepSuccessful("extract-data-from-data-provider")},
+		{
+			Step:                    newStepFailedRetryable("transform-data-extracted-from-data-provider", errors.New("some err")),
+			ContinueWorkflowOnError: true,
+			RetryConfigProvider:     defaultRetryConfigProviderTest,
+		},
+		{Step: newStepSuccessful("load-the-data-into-the-data-source")},
+		{Step: w2},
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		s := NewSequential("just-execute-these-steps-workflow", stepsCfg, nil)
+		s.Execute(context.TODO(), nil)
+	}
+}
+
+// MOCKS/STUBS
 type stepMock struct {
 	invocationCount                      int
 	succeedAtInvocationCount             int
@@ -213,47 +266,4 @@ func (c *stepMock) CanRetry() bool {
 	}
 
 	return c.canRetry
-}
-
-// BENCHMARKS
-func BenchmarkSequential(b *testing.B) {
-	stepsCfgW2 := []StepConfig{
-		{Step: newStepSuccessful("log-request-data")},
-		{Step: newStepSuccessful("notify-monitoring-system")},
-	}
-	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
-	stepsCfg := []StepConfig{
-		{Step: newStepSuccessful("extract-data-from-data-provider")},
-		{Step: newStepSuccessful("transform-data-extracted-from-data-provider")},
-		{Step: newStepSuccessful("load-the-data-into-the-data-source")},
-		{Step: w2},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		NewSequential("just-execute-these-steps-workflow", stepsCfg, nil).Execute(context.TODO(), nil)
-	}
-}
-
-func BenchmarkSequentialErrFlow(b *testing.B) {
-	stepsCfgW2 := []StepConfig{
-		{Step: newStepSuccessful("log-request-data")},
-		{Step: newStepSuccessful("notify-monitoring-system")},
-	}
-	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
-	stepsCfg := []StepConfig{
-		{Step: newStepSuccessful("extract-data-from-data-provider")},
-		{
-			Step:                    newStepFailedRetryable("transform-data-extracted-from-data-provider", errors.New("some err")),
-			ContinueWorkflowOnError: true,
-			RetryConfigProvider:     defaultRetryConfigProviderTest,
-		},
-		{Step: newStepSuccessful("load-the-data-into-the-data-source")},
-		{Step: w2},
-	}
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		NewSequential("just-execute-these-steps-workflow", stepsCfg, nil).Execute(context.TODO(), nil)
-	}
 }

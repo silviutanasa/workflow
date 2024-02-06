@@ -15,6 +15,8 @@ const (
 	failed  = "\u2717"
 )
 
+// bufPool is used by the internal logging system, to compute the string messages.
+// the reason fo this choice is to reduce allocations.
 var bufPool = sync.Pool{
 	New: func() any {
 		// The Pool's New function should generally only return pointer
@@ -24,12 +26,11 @@ var bufPool = sync.Pool{
 	},
 }
 
-// Sequential is the representation of a Sequential workflow.
-// The Sequential workflow runs the underlying stepsConfig in the order provided by the user([]Step order).
+// Sequential is a workflow that runs its steps in a predefined sequence(the order of the []StepConfig).
 type Sequential struct {
 	name        string
-	stepsConfig []StepConfig
-	log         Logger
+	stepsConfig []StepConfig // the workflow runs the steps following the slice order
+	log         Logger       // the internal logger is a no op if nil is provided
 }
 
 // NewSequential is the workflow constructor.
@@ -47,12 +48,16 @@ func NewSequential(name string, stepsCfg []StepConfig, log Logger) *Sequential {
 	return &s
 }
 
-// Name starts processing all the stepsConfig from the workflow inner chain of stepsConfig.
+// Name returns the name of the workflow.
 func (s *Sequential) Name() string {
 	return s.name
 }
 
-// Execute starts processing all the stepsConfig from the workflow inner chain of stepsConfig.
+// Execute loops through all the steps from the s.stepsConfig collection and passes the ctx and the req to every StepConfig.Step.
+// The errors returned by the failing steps are wrapped in a single error, so any error from any failing StepConfig.Step
+// can be checked using errors.Is or errors.As against the returned error.
+// In case a StepConfig.Step fails, the workflow checks for the StepConfig.ContinueWorkflowOnError flag, and stops processing
+// the remaining steps if the value is true.
 func (s *Sequential) Execute(ctx context.Context, req any) error {
 	s.log.Info(s.concatStr("[START] executing workflow: ", s.name))
 	defer func() { s.log.Info(s.concatStr("[DONE] executing workflow: ", s.name)) }()
@@ -84,6 +89,8 @@ func (s *Sequential) Execute(ctx context.Context, req any) error {
 	return nil
 }
 
+// concatStr produces a 0 allocation string concatenation, by taking the best parts from both bytes.Buffer and strings.Builder.
+// The resulting string must be consumed ASAP, otherwise the content is not guaranteed to stay the same.
 func (s *Sequential) concatStr(in ...string) string {
 	b := bufPool.Get().(*bytes.Buffer)
 	b.Reset()
@@ -92,10 +99,16 @@ func (s *Sequential) concatStr(in ...string) string {
 	for _, v := range in {
 		b.WriteString(v)
 	}
-
+	// keep in mind that, as the package name suggests, this approach is not safe, and the string should be
+	// "consumed" ASAP after this return, otherwise the content is not guaranteed.
+	// it works well in the non-concurrent pre logging string composition, as we send the content to the writer, right
+	// after this return.
 	return unsafe.String(unsafe.SliceData(b.Bytes()), len(b.Bytes()))
 }
 
+// executeStep processes a single Step by passing it the ctx and the req.
+// It retries the Step if it implements the Retryer interface, and uses the max attempts and the attempt delay provided
+// by the StepConfig.RetryConfigProvider() if it's not nil. If the StepConfig.RetryConfigProvider() is nil, there is no retry.
 func (s *Sequential) executeStep(ctx context.Context, stepCfg StepConfig, req any) error {
 	step := stepCfg.Step
 	stepName := step.Name()
