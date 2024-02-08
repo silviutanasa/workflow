@@ -5,17 +5,25 @@ import (
 	"time"
 )
 
-// Step represents a step of execution(data processor).
+// Step describes a step of execution.
 type Step interface {
-	// Name returns the name of the step.
+	// Name provides the identity of the step.
 	Name() string
 	// Execute is the step central processing unit.
 	// It accepts a context and a request.
 	Execute(ctx context.Context, request any) error
 }
 
-// Retryer signals if an operation is retryable.
-type Retryer interface {
+// StepConfig provides configuration for a Step of execution.
+type StepConfig struct {
+	Step                    Step
+	ContinueWorkflowOnError bool // decides if the workflow stops on Step errors
+	// define this only if the Step implements RetryDecider, otherwise it has no effect and no sense!
+	RetryConfigProvider func() (maxAttempts uint, attemptDelay time.Duration) // provides the retry configuration
+}
+
+// RetryDecider signals if an operation is retryable.
+type RetryDecider interface {
 	CanRetry() bool
 }
 
@@ -25,18 +33,12 @@ type Logger interface {
 	Error(msg string)
 }
 
-// StepConfig provides configuration for a Step of execution.
-type StepConfig struct {
-	Step                    Step
-	ContinueWorkflowOnError bool
-	// define this only if the Step implements Retryer, otherwise it has no effect and no sense!
-	RetryConfigProvider func() (maxAttempts uint, attemptDelay time.Duration)
-}
-
+// noOpLogger is the internal, default logger, and is a no op.
+// It exists only to allow the user to disable logging, by providing a nil logger to the Sequential constructor.
 type noOpLogger struct{}
 
-// Info is the Info Level log.
+// Info is the Info level log.
 func (n noOpLogger) Info(_ string) {}
 
-// Error is the Error Level log.
+// Error is the Error level log.
 func (n noOpLogger) Error(_ string) {}

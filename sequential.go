@@ -107,7 +107,7 @@ func (s *Sequential) concatStr(in ...string) string {
 }
 
 // executeStep processes a single Step by passing it the ctx and the req.
-// It retries the Step if it implements the Retryer interface, and uses the max attempts and the attempt delay provided
+// It retries the Step if it implements the RetryDecider interface, and uses the max attempts and the attempt delay provided
 // by the StepConfig.RetryConfigProvider() if it's not nil. If the StepConfig.RetryConfigProvider() is nil, there is no retry.
 func (s *Sequential) executeStep(ctx context.Context, stepCfg StepConfig, req any) error {
 	step := stepCfg.Step
@@ -122,7 +122,7 @@ func (s *Sequential) executeStep(ctx context.Context, stepCfg StepConfig, req an
 	var attempt uint
 	var err error
 	for attempt = 0; attempt <= maxAttempts; attempt++ {
-		// if the attempt is more than 0, then it's a retry
+		// if the attempt is greater than 0, then it's a retry
 		if attempt > 0 {
 			s.log.Info(
 				s.concatStr("step: ", stepName, " is configured to retry", ", retry attempt count: ", strconv.Itoa(int(attempt))),
@@ -138,8 +138,8 @@ func (s *Sequential) executeStep(ctx context.Context, stepCfg StepConfig, req an
 			break
 		}
 		s.log.Error(s.concatStr(failed, " executing step: ", stepName, ", err: ", err.Error()))
-
-		if stepR, ok := step.(Retryer); !ok || (ok && !stepR.CanRetry()) {
+		// only the ones implementing the RetryDecider, with CanRetry() returning true, can run more than once
+		if stepR, ok := step.(RetryDecider); !ok || (ok && !stepR.CanRetry()) {
 			break
 		}
 	}
