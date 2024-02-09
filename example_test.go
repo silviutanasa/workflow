@@ -1,25 +1,27 @@
-package workflow
+package workflow_test
 
 import (
 	"context"
 	"fmt"
+
+	"github.com/silviutanasa/workflow"
 )
 
 func ExampleSequential_Execute() {
 	// because it also implements the Step interface, the workflow can also be a step from another workflow.
-	stepsCfgEmb := []StepConfig{
+	stepsCfgEmb := []workflow.StepConfig{
 		{Step: &stepAbstract{name: "get-raw-data-from-db"}},
 		{Step: &stepAbstract{name: "transform-raw-data-into-models"}},
 	}
-	extractDataWorkflow := NewSequential("extract-data", stepsCfgEmb, nil)
+	extractDataWorkflow := workflow.NewSequential("extract-data", stepsCfgEmb, nil)
 
-	stepsCfg := []StepConfig{
+	stepsCfg := []workflow.StepConfig{
 		{Step: extractDataWorkflow},
 		{Step: &stepAbstract{name: "transform-data"}},
 		{Step: &stepAbstract{name: "load-data"}},
 	}
 
-	wf := NewSequential("ETL", stepsCfg, nil)
+	wf := workflow.NewSequential("ETL", stepsCfg, nil)
 	wf.Execute(context.TODO(), nil)
 	// Output:
 	//running: get-raw-data-from-db
