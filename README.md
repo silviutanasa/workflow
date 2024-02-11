@@ -47,7 +47,7 @@ func main() {
 	}
 	step2 := transformData{name: "transform-some-data"}
 	step3 := sendData{name: "send-some-data"}
-	wfConfig := []workflow.StepConfig{
+	wfConfig := []workflow.StepConfig[any]{
 		{Step: &step1},
 		{Step: &step2},
 		{Step: &step3},
@@ -66,7 +66,7 @@ type request struct {
 }
 
 /*
-   EXTRACT
+EXTRACT
 */
 type extractData struct {
 	name       string
@@ -89,7 +89,7 @@ func (e *extractData) Execute(ctx context.Context, req any) error {
 }
 
 /*
-   TRANSFORM
+TRANSFORM
 */
 type transformData struct {
 	name string
@@ -107,7 +107,7 @@ func (t *transformData) Execute(ctx context.Context, req any) error {
 }
 
 /*
-   LOAD
+LOAD
 */
 type sendData struct {
 	name string
@@ -144,7 +144,7 @@ func main() {
 	step2 := notifyManagementDepartment{name: "notify-management-department"}
 	step3 := notifyPagerDuty{name: "notify-pager-duty"}
 	step4 := notifyOnboardingDepartment{name: "notify-onboarding-department"}
-	wfConfig := []workflow.StepConfig{
+	wfConfig := []workflow.StepConfig[event]{
 		{Step: &step1, ContinueWorkflowOnError: true},
 		{Step: &step2, ContinueWorkflowOnError: true},
 		{Step: &step3, ContinueWorkflowOnError: true},
@@ -173,9 +173,8 @@ func (e *notifySalesDepartment) Name() string {
 	return e.name
 }
 
-func (e *notifySalesDepartment) Execute(ctx context.Context, req any) error {
-	ev := req.(event)
-	if ev.name != "client created" {
+func (e *notifySalesDepartment) Execute(ctx context.Context, req event) error {
+	if req.name != "client created" {
 		return nil
 	}
 	fmt.Println("Notifying sales department")
@@ -194,9 +193,8 @@ func (t *notifyManagementDepartment) Name() string {
 	return t.name
 }
 
-func (t *notifyManagementDepartment) Execute(ctx context.Context, req any) error {
-	ev := req.(event)
-	if ev.name != "contract cancelled" {
+func (t *notifyManagementDepartment) Execute(ctx context.Context, req event) error {
+	if req.name != "contract cancelled" {
 		return nil
 	}
 	fmt.Println("Notifying management department")
@@ -215,9 +213,8 @@ func (s *notifyPagerDuty) Name() string {
 	return s.name
 }
 
-func (s *notifyPagerDuty) Execute(ctx context.Context, req any) error {
-	ev := req.(event)
-	if ev.name != "critical error" {
+func (s *notifyPagerDuty) Execute(ctx context.Context, req event) error {
+	if req.name != "critical error" {
 		return nil
 	}
 	fmt.Println("Notifying pager duty")
@@ -236,9 +233,8 @@ func (n *notifyOnboardingDepartment) Name() string {
 	return n.name
 }
 
-func (n *notifyOnboardingDepartment) Execute(ctx context.Context, req any) error {
-	ev := req.(event)
-	if ev.name != "client created" {
+func (n *notifyOnboardingDepartment) Execute(ctx context.Context, req event) error {
+	if req.name != "client created" {
 		return nil
 	}
 	fmt.Println("Notifying onboarding department")

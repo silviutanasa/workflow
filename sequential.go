@@ -27,19 +27,19 @@ var bufPool = sync.Pool{
 }
 
 // Sequential is a workflow that runs its steps in a predefined sequence(the order of the []StepConfig).
-type Sequential struct {
+type Sequential[T any] struct {
 	name        string
-	stepsConfig []StepConfig // the workflow runs the steps following the slice order
-	log         Logger       // the internal logger is a no op if nil is provided
+	stepsConfig []StepConfig[T] // the workflow runs the steps following the slice order
+	log         Logger          // the internal logger is a no op if nil is provided
 }
 
 // NewSequential is the workflow constructor.
-func NewSequential(name string, stepsCfg []StepConfig, log Logger) *Sequential {
+func NewSequential[T any](name string, stepsCfg []StepConfig[T], log Logger) *Sequential[T] {
 	if log == nil {
 		log = noOpLogger{}
 	}
 
-	s := Sequential{
+	s := Sequential[T]{
 		name:        name,
 		stepsConfig: stepsCfg,
 		log:         log,
@@ -49,7 +49,7 @@ func NewSequential(name string, stepsCfg []StepConfig, log Logger) *Sequential {
 }
 
 // Name returns the name of the workflow.
-func (s *Sequential) Name() string {
+func (s *Sequential[T]) Name() string {
 	return s.name
 }
 
@@ -58,7 +58,7 @@ func (s *Sequential) Name() string {
 // can be checked using errors.Is or errors.As against the returned error.
 // In case a StepConfig.Step fails, the workflow checks for the StepConfig.ContinueWorkflowOnError flag, and stops processing
 // the remaining steps if the value is true.
-func (s *Sequential) Execute(ctx context.Context, req any) error {
+func (s *Sequential[T]) Execute(ctx context.Context, req T) error {
 	s.log.Info(s.concatStr("[START] executing workflow: ", s.name))
 	defer func() { s.log.Info(s.concatStr("[DONE] executing workflow: ", s.name)) }()
 
@@ -91,7 +91,7 @@ func (s *Sequential) Execute(ctx context.Context, req any) error {
 
 // concatStr produces a 0 allocation string concatenation, by taking the best parts from both bytes.Buffer and strings.Builder.
 // The resulting string must be consumed ASAP, otherwise the content is not guaranteed to stay the same.
-func (s *Sequential) concatStr(in ...string) string {
+func (s *Sequential[T]) concatStr(in ...string) string {
 	b := bufPool.Get().(*bytes.Buffer)
 	b.Reset()
 	defer bufPool.Put(b)
@@ -109,7 +109,7 @@ func (s *Sequential) concatStr(in ...string) string {
 // executeStep processes a single Step by passing it the ctx and the req.
 // It retries the Step if it implements the RetryDecider interface, and uses the max attempts and the attempt delay provided
 // by the StepConfig.RetryConfigProvider() if it's not nil. If the StepConfig.RetryConfigProvider() is nil, there is no retry.
-func (s *Sequential) executeStep(ctx context.Context, stepCfg StepConfig, req any) error {
+func (s *Sequential[T]) executeStep(ctx context.Context, stepCfg StepConfig[T], req T) error {
 	step := stepCfg.Step
 	stepName := step.Name()
 

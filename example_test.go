@@ -9,13 +9,13 @@ import (
 
 func ExampleSequential_Execute() {
 	// because it also implements the Step interface, the workflow can also be a step from another workflow.
-	stepsCfgEmb := []workflow.StepConfig{
+	stepsCfgEmb := []workflow.StepConfig[any]{
 		{Step: &stepAbstract{name: "get-raw-data-from-db"}},
 		{Step: &stepAbstract{name: "transform-raw-data-into-models"}},
 	}
 	extractDataWorkflow := workflow.NewSequential("extract-data", stepsCfgEmb, nil)
 
-	stepsCfg := []workflow.StepConfig{
+	stepsCfg := []workflow.StepConfig[any]{
 		{Step: extractDataWorkflow},
 		{Step: &stepAbstract{name: "transform-data"}},
 		{Step: &stepAbstract{name: "load-data"}},

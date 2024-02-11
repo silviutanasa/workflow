@@ -11,7 +11,7 @@ var defaultRetryConfigProviderTest = func() (maxAttempts uint, attemptDelay time
 
 func TestExecuteBehaviourOnPreservingErrorsType(t *testing.T) {
 	anyErr := errors.New("any-error")
-	input := []StepConfig{
+	input := []StepConfig[any]{
 		{Step: &stepMock{name: "cmd2"}},
 		{Step: &stepMock{name: "cmd3", execute: anyErr}},
 	}
@@ -29,7 +29,7 @@ func TestExecuteBehaviourOnReturningErrors(t *testing.T) {
 	anyErr := errors.New("any-err")
 	tests := []struct {
 		name           string
-		input          []StepConfig
+		input          []StepConfig[any]
 		expectedOutput error
 	}{
 		{
@@ -39,7 +39,7 @@ func TestExecuteBehaviourOnReturningErrors(t *testing.T) {
 		},
 		{
 			name: "a workflow with steps returning errors, but configured not to stop on them, should return an error",
-			input: []StepConfig{
+			input: []StepConfig[any]{
 				{Step: newStepFailedRetryable("step 1", anyErr), ContinueWorkflowOnError: true},
 				{Step: newStepSuccessful("step 2")},
 			},
@@ -47,7 +47,7 @@ func TestExecuteBehaviourOnReturningErrors(t *testing.T) {
 		},
 		{
 			name: "a workflow with steps returning errors, but configured to retry, should not return an error if it succeeds on retry",
-			input: []StepConfig{
+			input: []StepConfig[any]{
 				{Step: newStepFailedRetryableRecoverable("step 1", anyErr, 2), RetryConfigProvider: defaultRetryConfigProviderTest},
 				{Step: newStepFailedRetryableRecoverable("step 2", anyErr, 3), RetryConfigProvider: defaultRetryConfigProviderTest},
 				{Step: newStepSuccessful("step 3")},
@@ -56,7 +56,7 @@ func TestExecuteBehaviourOnReturningErrors(t *testing.T) {
 		},
 		{
 			name: "a workflow with steps returning errors, but configured to retry, should return an error if it not succeed on retry",
-			input: []StepConfig{
+			input: []StepConfig[any]{
 				{Step: newStepFailedRetryable("step 1", anyErr), RetryConfigProvider: defaultRetryConfigProviderTest},
 				{Step: newStepSuccessful("step 2"), RetryConfigProvider: defaultRetryConfigProviderTest},
 			},
@@ -82,19 +82,19 @@ func TestExecuteBehaviourOnRetry(t *testing.T) {
 	anyErr := errors.New("any-err")
 	tests := []struct {
 		name           string
-		input          []StepConfig
+		input          []StepConfig[any]
 		expectedOutput int
 	}{
 		{
 			name: "a workflow with steps returning errors, but configured to retry, should stop retrying if the step returns false on retry",
-			input: []StepConfig{
+			input: []StepConfig[any]{
 				{Step: newStepFailedNonRetryableFromInvocationCount("step 1", anyErr, 1), RetryConfigProvider: defaultRetryConfigProviderTest},
 			},
 			expectedOutput: 1,
 		},
 		{
 			name: "a workflow with steps returning errors, but configured to retry, should not stop retrying if the step don't change its retry flag",
-			input: []StepConfig{
+			input: []StepConfig[any]{
 				{Step: newStepFailedRetryable("step 1", anyErr), RetryConfigProvider: defaultRetryConfigProviderTest},
 			},
 			expectedOutput: 3,
@@ -128,12 +128,12 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 
 	tests := []struct {
 		name           string
-		input          []StepConfig
+		input          []StepConfig[any]
 		expectedOutput behaviour
 	}{
 		{
 			name: "a workflow with steps returning errors, but configured not to stop on them, should invoke all the steps",
-			input: []StepConfig{
+			input: []StepConfig[any]{
 				{Step: newStepFailedNonRetryable("step 1", anyErr), ContinueWorkflowOnError: true},
 				{Step: newStepFailedNonRetryable("step 2", anyErr), ContinueWorkflowOnError: true},
 				{Step: newStepSuccessful("step 3")},
@@ -142,7 +142,7 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 		},
 		{
 			name: "a workflow with steps returning errors, but configured to stop on them, should not invoke the remaining steps",
-			input: []StepConfig{
+			input: []StepConfig[any]{
 				{Step: newStepSuccessful("step 1")},
 				{Step: newStepFailedNonRetryable("step 2", anyErr)},
 				{Step: newStepSuccessful("step 3")},
@@ -174,12 +174,12 @@ func Test_Execute_BehaviourOnStoppingWorkflow(t *testing.T) {
 // BenchmarkSequentialHappyFlow performs a benchmark for the scenario in which there is no error in the workflow.
 // This should produce 0 allocations.
 func BenchmarkSequentialHappyFlow(b *testing.B) {
-	stepsCfgW2 := []StepConfig{
+	stepsCfgW2 := []StepConfig[any]{
 		{Step: newStepSuccessful("log-request-data")},
 		{Step: newStepSuccessful("notify-monitoring-system")},
 	}
 	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
-	stepsCfg := []StepConfig{
+	stepsCfg := []StepConfig[any]{
 		{Step: newStepSuccessful("extract-data-from-data-provider")},
 		{Step: newStepSuccessful("transform-data-extracted-from-data-provider")},
 		{Step: newStepSuccessful("load-the-data-into-the-data-source")},
@@ -196,12 +196,12 @@ func BenchmarkSequentialHappyFlow(b *testing.B) {
 // BenchmarkSequentialErrFlow performs a benchmark for the scenario in which there are errors in the workflow.
 // This should produce 3 allocations, corresponding to the error usage (allocation for the error slice and errors.Join)
 func BenchmarkSequentialErrFlow(b *testing.B) {
-	stepsCfgW2 := []StepConfig{
+	stepsCfgW2 := []StepConfig[any]{
 		{Step: newStepSuccessful("log-request-data")},
 		{Step: newStepSuccessful("notify-monitoring-system")},
 	}
 	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
-	stepsCfg := []StepConfig{
+	stepsCfg := []StepConfig[any]{
 		{Step: newStepSuccessful("extract-data-from-data-provider")},
 		{
 			Step:                    newStepFailedRetryable("transform-data-extracted-from-data-provider", errors.New("some err")),
