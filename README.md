@@ -56,7 +56,7 @@ func main() {
 	}
 	step2 := transformData{name: "transform-some-data"}
 	step3 := sendData{name: "send-some-data"}
-	wfConfig := []workflow.StepConfig[any]{
+	wfConfig := []workflow.SequentialStepConfig[any]{
 		{Step: &step1},
 		{Step: &step2},
 		{Step: &step3},
@@ -153,7 +153,7 @@ func main() {
 	step2 := notifyManagementDepartment{name: "notify-management-department"}
 	step3 := notifyPagerDuty{name: "notify-pager-duty"}
 	step4 := notifyOnboardingDepartment{name: "notify-onboarding-department"}
-	wfConfig := []workflow.StepConfig[event]{
+	wfConfig := []workflow.SequentialStepConfig[event]{
 		{Step: &step1, ContinueWorkflowOnError: true},
 		{Step: &step2, ContinueWorkflowOnError: true},
 		{Step: &step3, ContinueWorkflowOnError: true},
