@@ -37,11 +37,12 @@ linters-settings:
       - name: receiver-naming
       - name: indent-error-flow
       - name: argument-limit
-        arguments: [ 6 ]
+        arguments: [ 5 ]
       - name: cyclomatic
         arguments: [ 9 ]
       - name: superfluous-else
-      - name: confusing-naming
+      # it reports false positives, so check the project page for fixes
+      #      - name: confusing-naming
       - name: modifies-parameter
       - name: deep-exit
       - name: unused-parameter

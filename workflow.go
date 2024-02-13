@@ -1,25 +1,25 @@
 package workflow
 
 import (
-	"context"
-	"time"
+	"bytes"
+	"sync"
+	"unsafe"
 )
 
-// Step describes a step of execution.
-type Step[T any] interface {
-	// Name provides the identity of the step.
-	Name() string
-	// Execute is the step central processing unit.
-	// It accepts a context and a request.
-	Execute(ctx context.Context, req T) error
-}
+const (
+	succeed = "\u2713"
+	failed  = "\u2717"
+)
 
-// StepConfig provides configuration for a Step of execution.
-type StepConfig[T any] struct {
-	Step                    Step[T]
-	ContinueWorkflowOnError bool // decides if the workflow stops on Step errors
-	// define this only if the Step implements RetryDecider, otherwise it has no effect and no sense!
-	RetryConfigProvider func() (maxAttempts uint, attemptDelay time.Duration) // provides the retry configuration
+// bufPool is used by the internal logging system, to compute the string messages.
+// the reason fo this choice is to reduce allocations.
+var bufPool = sync.Pool{
+	New: func() any {
+		// The Pool's New function should generally only return pointer
+		// types, since a pointer can be put into the return interface
+		// value without an allocation:
+		return new(bytes.Buffer)
+	},
 }
 
 // RetryDecider signals if an operation is retryable.
@@ -42,3 +42,20 @@ func (n noOpLogger) Info(_ string) {}
 
 // Error is the Error level log.
 func (n noOpLogger) Error(_ string) {}
+
+// concatStr produces a 0 allocation string concatenation, by taking the best parts from both bytes.Buffer and strings.Builder.
+// The resulting string must be consumed ASAP, otherwise the content is not guaranteed to stay the same.
+func concatStr(in ...string) string {
+	b := bufPool.Get().(*bytes.Buffer)
+	b.Reset()
+	defer bufPool.Put(b)
+
+	for _, v := range in {
+		b.WriteString(v)
+	}
+	// keep in mind that, as the package name suggests, this approach is not safe, and the string should be
+	// "consumed" ASAP after this return, otherwise the content is not guaranteed.
+	// it works well in the non-concurrent pre logging string composition, as we send the content to the writer, right
+	// after this return.
+	return unsafe.String(unsafe.SliceData(b.Bytes()), len(b.Bytes()))
+}
