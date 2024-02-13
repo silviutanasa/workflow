@@ -9,6 +9,11 @@ Every step can be configured to stop the workflow on failure(default behaviour) 
 steps. \
 It has the ability to retry at the step level, with a configured number of attempts and delay.
 
+**Pipe** is a workflow that runs all of its steps/commands in a predefined order/sequence. \
+Except for the first step, which receives the initial request as input, every subsequent step receives as an input, the
+output of the previous step. Any failing step stops the workflow. \
+It has the ability to retry at the step level, with a configured number of attempts and delay.
+
 <strong>Installation:</strong>
 
 ```
