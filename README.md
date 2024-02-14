@@ -56,7 +56,7 @@ func main() {
 	}
 	step2 := transformData{name: "transform-some-data"}
 	step3 := sendData{name: "send-some-data"}
-	wfConfig := []workflow.SequentialStepConfig[any]{
+	wfConfig := []workflow.SequentialStepConfig[*request]{
 		{Step: &step1},
 		{Step: &step2},
 		{Step: &step3},
@@ -86,13 +86,12 @@ func (e *extractData) Name() string {
 	return e.name
 }
 
-func (e *extractData) Execute(ctx context.Context, req any) error {
-	r := req.(*request)
+func (e *extractData) Execute(ctx context.Context, req *request) error {
 	inp, err := io.ReadAll(e.dataSource)
 	if err != nil {
 		return err
 	}
-	r.inputData = inp
+	req.inputData = inp
 
 	return nil
 }
@@ -108,9 +107,8 @@ func (t *transformData) Name() string {
 	return t.name
 }
 
-func (t *transformData) Execute(ctx context.Context, req any) error {
-	r := req.(*request)
-	r.inputData = bytes.ToUpper(r.inputData)
+func (t *transformData) Execute(ctx context.Context, req *request) error {
+	req.inputData = bytes.ToUpper(req.inputData)
 
 	return nil
 }
@@ -126,12 +124,12 @@ func (s *sendData) Name() string {
 	return s.name
 }
 
-func (s *sendData) Execute(ctx context.Context, req any) error {
-	r := req.(*request)
-	fmt.Printf("%s", r.inputData)
+func (s *sendData) Execute(ctx context.Context, req *request) error {
+	fmt.Printf("%s", req.inputData)
 
 	return nil
 }
+
 
 ```
 
