@@ -1,5 +1,7 @@
 # Workflow
 
+[![GoDoc][doc-img]][doc]
+
 A library that allows you to decompose the business logic in steps and orchestrate them in a workflow. \
 The abstraction, based on the <strong>composite</strong> pattern and <strong>chain of responsibility/commands</strong>,
 allows for infinite nesting, as the workflow itself can be a component of another workflow and so on.
@@ -250,3 +252,6 @@ func (n *notifyOnboardingDepartment) Execute(ctx context.Context, req event) err
 }
 
 ```
+
+[doc-img]: https://pkg.go.dev/badge/silviutanasa/workflow
+[doc]: https://pkg.go.dev/github.com/silviutanasa/workflow
