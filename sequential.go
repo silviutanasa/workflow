@@ -65,6 +65,7 @@ func (s *Sequential[T]) Execute(ctx context.Context, req T) error {
 	for _, stepConfig := range s.stepsConfig {
 		err = s.executeStep(ctx, stepConfig, req)
 		if err != nil {
+			// this prevents extra allocations, by creating the slice only once, and with enough capacity.
 			if errs == nil {
 				errs = make([]error, 0, len(s.stepsConfig))
 			}
@@ -87,11 +88,11 @@ func (s *Sequential[T]) Execute(ctx context.Context, req T) error {
 	}
 
 	switch {
+	// prevents unnecessary allocations caused by errors.Join, if the collection holds only 1 error.
 	case len(errs) == 1:
 		return errs[0]
 	case len(errs) > 1:
 		return errors.Join(errs...)
-
 	}
 
 	return nil
@@ -110,13 +111,13 @@ func (s *Sequential[T]) executeStep(ctx context.Context, stepCfg SequentialStepC
 		maxAttempts, attemptDelay = stepCfg.RetryConfigProvider()
 	}
 
-	var attempt uint
+	var attempt int
 	var err error
-	for attempt = 0; attempt <= maxAttempts; attempt++ {
+	for attempt = 0; attempt <= int(maxAttempts); attempt++ {
 		// if the attempt is greater than 0, then it's a retry
 		if attempt > 0 {
 			s.log.Info(
-				concatStr("step: ", stepName, " is configured to retry", ", retry attempt count: ", strconv.Itoa(int(attempt))),
+				concatStr("step: ", stepName, " is configured to retry", ", retry attempt count: ", strconv.Itoa(attempt)),
 			)
 			// allow some waiting time before trying again
 			s.log.Info(concatStr("waiting for: ", strconv.FormatInt(attemptDelay.Milliseconds(), 10), "ms before retry attempt"))
