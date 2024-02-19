@@ -16,7 +16,7 @@ Except for the first step, which receives the initial request as input, every su
 output of the previous step. Any failing step stops the workflow. \
 It has the ability to retry at the step level, with a configured number of attempts and delay.
 
-<strong>Installation:</strong>
+## Installation:
 
 ```
 go get github.com/silviutanasa/workflow
@@ -24,7 +24,7 @@ go get github.com/silviutanasa/workflow
 
 Note that the minimum supported version is Go v1.20.
 
-<strong>Performance</strong>:
+## Performance:
 
 ```
 sequential happy flow(no errors on steps):                  0 allocs/op
@@ -35,7 +35,7 @@ pipe happy flow(no errors on steps):                        0 allocs/op
 pipe error flow(1 error and steps retries):                 0 allocs/op
 ```
 
-<strong>Usage:</strong>
+## Usage:
 <details>
 <summary>example 1: A set of steps sharing the same request as common state.</summary>
 
