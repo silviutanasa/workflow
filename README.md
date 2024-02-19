@@ -35,8 +35,9 @@ pipe happy flow(no errors on steps):                        0 allocs/op
 pipe error flow(1 error and steps retries):                 0 allocs/op
 ```
 
-<strong>Usage:</strong>\
-example 1: A set of steps sharing the same request as common state
+<strong>Usage:</strong>
+<details>
+<summary>example 1: A set of steps sharing the same request as common state.</summary>
 
 ```Go
 package main
@@ -134,8 +135,9 @@ func (s *sendData) Execute(ctx context.Context, req *request) error {
 
 
 ```
-
-example 2: A set of steps with no shared state, that reacts to an external event (chain of responsibility). All the
+</details>
+<details>
+<summary>example 2: A set of steps with no shared state, that reacts to an external event (chain of responsibility).</summary> All the
 steps have the chance to process the event(by setting "ContinueWorkflowOnError: true" for every StepConfig).
 
 ```Go
@@ -252,6 +254,87 @@ func (n *notifyOnboardingDepartment) Execute(ctx context.Context, req event) err
 }
 
 ```
+</details>
+<details>
+<summary>example 3: A set of steps that process a string in a "pipe like" way.</summary> All the
+steps have the chance to process the event(by setting "ContinueWorkflowOnError: true" for every StepConfig).
+
+```Go
+package main
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/silviutanasa/workflow"
+)
+
+func main() {
+	stepsCfg := []workflow.PipeStepConfig[string]{
+		{Step: &trimSpaces{name: "trim-spaces"}},
+		{Step: &removeCommas{name: "remove-commas"}},
+		{Step: &removeDots{name: "remove-dots"}},
+		{Step: &transformToUppercase{name: "transform-to-upper"}},
+	}
+
+	wf := workflow.NewPipe("ETL", stepsCfg, nil)
+	output, err := wf.Execute(context.TODO(), "    I. am. the, string. to be transformed,   ,     ")
+	if err != nil {
+		fmt.Printf("Workflow processed with errors: %v", err)
+	}
+}
+
+type trimSpaces struct {
+	name string
+}
+
+func (s *trimSpaces) Name() string {
+	return s.name
+}
+
+func (s *trimSpaces) Execute(ctx context.Context, req string) (string, error) {
+	return strings.TrimSpace(req), nil
+}
+
+type transformToUppercase struct {
+	name string
+}
+
+func (s *transformToUppercase) Name() string {
+	return s.name
+}
+
+func (s *transformToUppercase) Execute(ctx context.Context, req string) (string, error) {
+	return strings.ToUpper(req), nil
+}
+
+type removeCommas struct {
+	name string
+}
+
+func (s *removeCommas) Name() string {
+	return s.name
+}
+
+func (s *removeCommas) Execute(ctx context.Context, req string) (string, error) {
+	return strings.ReplaceAll(req, ",", ""), nil
+}
+
+type removeDots struct {
+	name string
+}
+
+func (s *removeDots) Name() string {
+	return s.name
+}
+
+func (s *removeDots) Execute(ctx context.Context, req string) (string, error) {
+	return strings.ReplaceAll(req, ".", ""), nil
+}
+
+```
+</details>
 
 [doc-img]: https://pkg.go.dev/badge/silviutanasa/workflow
 [doc]: https://pkg.go.dev/github.com/silviutanasa/workflow
