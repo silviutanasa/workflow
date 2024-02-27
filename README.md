@@ -1,6 +1,7 @@
 # Workflow
 
 [![GoDoc][doc-img]][doc]
+[![Go Report Card][go-report-img]][go-report]
 
 A library that allows you to decompose the business logic in steps and orchestrate them in a workflow. \
 The abstraction, based on the <strong>composite</strong> pattern and <strong>chain of responsibility/commands</strong>,
@@ -338,3 +339,5 @@ func (s *removeDots) Execute(ctx context.Context, req string) (string, error) {
 
 [doc-img]: https://pkg.go.dev/badge/silviutanasa/workflow
 [doc]: https://pkg.go.dev/github.com/silviutanasa/workflow
+[go-report-img]: https://goreportcard.com/badge/github.com/silviutanasa/workflow
+[go-report]: https://goreportcard.com/report/github.com/silviutanasa/workflow
