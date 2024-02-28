@@ -9,6 +9,10 @@ import (
 const (
 	succeed = "\u2713"
 	failed  = "\u2717"
+
+	// used for logging
+	infoLevel  = 1
+	errorLevel = 2
 )
 
 // bufPool is used by the internal logging system, to compute the string messages.
