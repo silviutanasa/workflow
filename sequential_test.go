@@ -16,7 +16,7 @@ func TestSequentialExecuteBehaviourOnPreservingErrorsType(t *testing.T) {
 		{Step: newStepFailedNonRetryable("step2", anyErr)},
 	}
 
-	c := NewSequential("some-workflow", input, nil)
+	c := NewSequential("some-workflow", input)
 	actualOutput := c.Execute(context.TODO(), nil)
 	expectedOutput := anyErr
 
@@ -65,7 +65,7 @@ func TestSequentialExecuteBehaviourOnReturningErrors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("some-workflow", tt.input, nil)
+			c := NewSequential("some-workflow", tt.input)
 			actualOutput := c.Execute(context.TODO(), nil)
 
 			if !errors.Is(actualOutput, tt.expectedOutput) {
@@ -102,7 +102,7 @@ func TestSequentialExecuteBehaviourOnRetry(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("some-workflow", tt.input, nil)
+			c := NewSequential("some-workflow", tt.input)
 			c.Execute(context.TODO(), nil)
 
 			actualOutput := c.stepsConfig[0].Step.(*stepMock).invocationCount
@@ -153,7 +153,7 @@ func TestSequentialExecuteBehaviourOnStoppingWorkflow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := NewSequential("some-workflow", tt.input, nil)
+			c := NewSequential("some-workflow", tt.input)
 			c.Execute(context.TODO(), nil)
 
 			actualOutput := tt.input[len(tt.input)-1].Step.(*stepMock).invocationCount > 0
@@ -178,7 +178,7 @@ func BenchmarkSequentialExecuteHappyFlow(b *testing.B) {
 		{Step: newStepSuccessful("log-request-data")},
 		{Step: newStepSuccessful("notify-monitoring-system")},
 	}
-	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
+	w2 := NewSequential("monitoring-workflow", stepsCfgW2)
 	stepsCfg := []SequentialStepConfig[any]{
 		{Step: newStepSuccessful("extract-data-from-data-provider")},
 		{Step: newStepSuccessful("transform-data-extracted-from-data-provider")},
@@ -188,7 +188,7 @@ func BenchmarkSequentialExecuteHappyFlow(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s := NewSequential("just-execute-these-steps-workflow", stepsCfg, nil)
+		s := NewSequential("just-execute-these-steps-workflow", stepsCfg)
 		s.Execute(context.TODO(), nil)
 	}
 }
@@ -200,7 +200,7 @@ func BenchmarkSequentialExecuteErrFlowOneErr(b *testing.B) {
 		{Step: newStepSuccessful("log-request-data")},
 		{Step: newStepSuccessful("notify-monitoring-system")},
 	}
-	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
+	w2 := NewSequential("monitoring-workflow", stepsCfgW2)
 	stepsCfg := []SequentialStepConfig[any]{
 		{Step: newStepSuccessful("extract-data-from-data-provider")},
 		{
@@ -214,16 +214,17 @@ func BenchmarkSequentialExecuteErrFlowOneErr(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		s := NewSequential("just-execute-these-steps-workflow", stepsCfg, nil)
+		s := NewSequential("just-execute-these-steps-workflow", stepsCfg)
 		s.Execute(context.TODO(), nil)
 	}
 }
+
 func BenchmarkSequentialExecuteErrFlowMultipleErr(b *testing.B) {
 	stepsCfgW2 := []SequentialStepConfig[any]{
 		{Step: newStepSuccessful("log-request-data")},
 		{Step: newStepSuccessful("notify-monitoring-system")},
 	}
-	w2 := NewSequential("monitoring-workflow", stepsCfgW2, nil)
+	w2 := NewSequential("monitoring-workflow", stepsCfgW2)
 	stepsCfg := []SequentialStepConfig[any]{
 		//{SequentialStep: newStepSuccessful("extract-data-from-data-provider")},
 		{Step: newStepFailedRetryable("extract-data-from-data-provider", errors.New("some err")), ContinueWorkflowOnError: true},
@@ -271,6 +272,10 @@ func (c *stepMock) CanRetry() bool {
 	}
 
 	return c.canRetry
+}
+
+func (c *stepMock) InvocationCount() int {
+	return c.invocationCount
 }
 
 func newStepSuccessful(name string) *stepMock {

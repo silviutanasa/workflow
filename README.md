@@ -10,7 +10,10 @@ allows for infinite nesting, as the workflow itself can be a component of anothe
 **Sequential** is a workflow that runs all of its steps/commands in a predefined order/sequence. \
 Every step can be configured to stop the workflow on failure(default behaviour) or let it process the rest of the
 steps. \
-It has the ability to retry at the step level, with a configured number of attempts and delay.
+It has the ability to retry at the step level, with a configured number of attempts and delay. \
+<u>Optionally</u> you can pass a storage option to the constructor to be able to replay the same request without the \
+fear of duplicating successful steps. This becomes handy on microservice arch. when is needed to replay an event.
+
 
 **Pipe** is a workflow that runs all of its steps/commands in a predefined order/sequence. \
 Except for the first step, which receives the initial request as input, every subsequent step receives as an input, the
@@ -65,7 +68,7 @@ func main() {
 		{Step: &step2},
 		{Step: &step3},
 	}
-	wf := workflow.NewSequential("ETL", wfConfig, nil)
+	wf := workflow.NewSequential("ETL", wfConfig)
 	req := request{id: "1"}
 	err := wf.Execute(context.Background(), &req)
 	if err != nil {
@@ -162,7 +165,7 @@ func main() {
 		{Step: &step3, ContinueWorkflowOnError: true},
 		{Step: &step4, ContinueWorkflowOnError: true},
 	}
-	wf := workflow.NewSequential("ETL", wfConfig, nil)
+	wf := workflow.NewSequential("ETL", wfConfig)
 	req := event{name: "client created"}
 	err := wf.Execute(context.Background(), req)
 	if err != nil {
@@ -335,6 +338,13 @@ func (s *removeDots) Execute(ctx context.Context, req string) (string, error) {
 }
 
 ```
+</details>
+
+<details>
+<summary>example 4: Use Sequential workflow with storage to be able to store each step </summary> 
+Each step result is stored and if the same request gets replayed the workflow will execute only previous failed steps.
+
+See: `storage_test.go`
 </details>
 
 [doc-img]: https://pkg.go.dev/badge/silviutanasa/workflow

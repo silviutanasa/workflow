@@ -3,9 +3,8 @@ package workflow_test
 import (
 	"context"
 	"fmt"
-	"strings"
-
 	"github.com/silviutanasa/workflow"
+	"strings"
 )
 
 func ExampleSequential_Execute() {
@@ -14,7 +13,7 @@ func ExampleSequential_Execute() {
 		{Step: &sequentialStepAbstract{name: "get-raw-data-from-db"}},
 		{Step: &sequentialStepAbstract{name: "transform-raw-data-into-models"}},
 	}
-	extractDataWorkflow := workflow.NewSequential("extract-data", stepsCfgEmb, nil)
+	extractDataWorkflow := workflow.NewSequential("extract-data", stepsCfgEmb)
 
 	stepsCfg := []workflow.SequentialStepConfig[any]{
 		{Step: extractDataWorkflow},
@@ -22,7 +21,7 @@ func ExampleSequential_Execute() {
 		{Step: &sequentialStepAbstract{name: "load-data"}},
 	}
 
-	wf := workflow.NewSequential("ETL", stepsCfg, nil)
+	wf := workflow.NewSequential("ETL", stepsCfg)
 	wf.Execute(context.TODO(), nil)
 	// Output:
 	//running: get-raw-data-from-db
